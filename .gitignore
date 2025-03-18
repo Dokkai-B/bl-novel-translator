@@ -1,11 +1,10 @@
+# Ignore API keys
+.env
+
 # Ignore Python cache files
 __pycache__/
 *.pyc
 *.pyo
-*.pyd
 
-# Ignore VS Code settings
-.vscode/
-
-# Ignore API keys (important)
-.env
+# Ignore virtual environment
+venv/
