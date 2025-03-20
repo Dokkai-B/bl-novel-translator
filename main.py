@@ -1,6 +1,7 @@
 import openai
 import os
 from dotenv import load_dotenv
+from novel_scraper import extract_novel_content
 
 # Load environment variables from .env file
 load_dotenv()
@@ -36,9 +37,53 @@ def read_novel_from_file(file_path):
     with open(file_path, "r", encoding="utf-8") as file:
         return file.read()
 
+def split_text(text, max_length=4000):
+    """ Splits the text into smaller chunks to avoid exceeding token limits. """
+    paragraphs = text.split("\n")
+    chunks = []
+    current_chunk = ""
+
+    for paragraph in paragraphs:
+        if len(current_chunk) + len(paragraph) < max_length:
+            current_chunk += paragraph + "\n"
+        else:
+            chunks.append(current_chunk)
+            current_chunk = paragraph + "\n"
+
+    if current_chunk:
+        chunks.append(current_chunk)
+
+    return chunks
+
 if __name__ == "__main__":
-    file_path = "novel.txt"  # Change this if needed
-    text_to_translate = read_novel_from_file(file_path)
-    translated_text = translate_text(text_to_translate, "Chinese")
-    print("\n🔹 Original Text:", text_to_translate[:500])  # Print first 500 characters for preview
-    print("✅ Translated Text:", translated_text)
+    url = input("Enter the novel chapter URL: ")
+    novel_text = extract_novel_content(url)
+
+    # Save the extracted text to a file
+    with open("novel.txt", "w", encoding="utf-8") as file:
+        file.write(novel_text)
+
+    print("\n✅ Extracted text has been saved to 'novel.txt'")
+
+    # Read the extracted novel
+    text_to_translate = read_novel_from_file("novel.txt")
+
+    # Split text into chunks for translation
+    text_chunks = split_text(text_to_translate)
+
+    translated_chunks = []
+    print("\n🔄 Translating text...")
+
+    for index, chunk in enumerate(text_chunks):
+        print(f"Translating chunk {index + 1} of {len(text_chunks)}...")
+        translated_text = translate_text(chunk, "Chinese", "English")
+        translated_chunks.append(translated_text)
+
+    # Combine all translated chunks
+    full_translation = "\n".join(translated_chunks)
+
+    # Save translated text
+    with open("translated_novel.txt", "w", encoding="utf-8") as file:
+        file.write(full_translation)
+
+    print("\n✅ Translation completed! Saved to 'translated_novel.txt'")
