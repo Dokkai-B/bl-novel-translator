@@ -3,7 +3,7 @@ import openai
 from dotenv import load_dotenv
 from datetime import datetime
 from novel_scraper import extract_novel_content
-from upload_to_s3 import upload_file_to_s3, list_library_files
+from upload_to_s3 import upload_file_to_s3, list_library_files, download_file_from_s3
 
 # Load environment variables
 load_dotenv()
@@ -84,11 +84,35 @@ def main_menu():
         translate_and_upload(text)
         print("✅ Done.")
     elif choice == "2":
-        print("\n📂 Library Contents:")
-        for i, key in enumerate(list_library_files(), 1):
-            print(f"{i}. {key}")
+        view_library()
     else:
         print("❌ Invalid choice.")
+
+def view_library():
+    files = list_library_files()
+    if not files:
+        print("Library is empty.")
+        return
+
+    print("\n📂 Library Contents:")
+    for idx, file in enumerate(files, 1):
+        print(f"{idx}. {file}")
+
+    try:
+        choice = int(input("\nSelect a chapter number to read: "))
+        if 1 <= choice <= len(files):
+            selected_file = files[choice - 1]
+            local_path = "downloaded_chapter.txt"
+            download_file_from_s3(selected_file, local_path)
+
+            with open(local_path, "r", encoding="utf-8") as f:
+                content = f.read()
+                print("\n📖 Chapter Content:\n")
+                print(content)  # Print up to 3000 characters only
+        else:
+            print("Invalid selection.")
+    except ValueError:
+        print("Invalid input. Please enter a number.")
 
 if __name__ == "__main__":
     main_menu()
