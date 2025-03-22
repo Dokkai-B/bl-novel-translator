@@ -1,101 +1,94 @@
-import openai
 import os
+import openai
 from dotenv import load_dotenv
-from novel_scraper import extract_novel_content
-from upload_to_s3 import upload_file_to_s3
 from datetime import datetime
+from novel_scraper import extract_novel_content
+from upload_to_s3 import upload_file_to_s3, list_library_files
 
-# Load environment variables from .env file
+# Load environment variables
 load_dotenv()
 
-# Get API Key securely
+# Initialize OpenAI
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-
-# Ensure API Key exists
-if not OPENAI_API_KEY:
-    raise ValueError("Missing OpenAI API key. Add it to .env file.")
-
-client = openai.OpenAI(api_key=OPENAI_API_KEY)  # Updated to new API client
+client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
 def translate_text(text, source_language="Chinese", target_language="English"):
-    """
-    Function to translate text from source_language to target_language using OpenAI GPT.
-    """
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",  # Change the model here
-            messages=[
-                {"role": "system", "content": f"You are a professional translator. Translate the following {source_language} text to fluent {target_language}."},
-                {"role": "user", "content": text}
-            ]
-        )
-        return response.choices[0].message.content  # Updated response format
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": f"You are a professional translator. Translate this {source_language} text to fluent {target_language}."},
+            {"role": "user", "content": text}
+        ]
+    )
+    return response.choices[0].message.content
 
-    except Exception as e:
-        return f"Error: {e}"
+def read_file(file_path):
+    with open(file_path, "r", encoding="utf-8") as f:
+        return f.read()
 
-def read_novel_from_file(file_path):
-    """ Reads a text file and returns the content. """
-    with open(file_path, "r", encoding="utf-8") as file:
-        return file.read()
+def save_text(file_path, content):
+    with open(file_path, "w", encoding="utf-8") as f:
+        f.write(content)
 
 def split_text(text, max_length=4000):
-    """ Splits the text into smaller chunks to avoid exceeding token limits. """
     paragraphs = text.split("\n")
-    chunks = []
-    current_chunk = ""
-
-    for paragraph in paragraphs:
-        if len(current_chunk) + len(paragraph) < max_length:
-            current_chunk += paragraph + "\n"
+    chunks, chunk = [], ""
+    for para in paragraphs:
+        if len(chunk) + len(para) < max_length:
+            chunk += para + "\n"
         else:
-            chunks.append(current_chunk)
-            current_chunk = paragraph + "\n"
-
-    if current_chunk:
-        chunks.append(current_chunk)
-
+            chunks.append(chunk)
+            chunk = para + "\n"
+    if chunk:
+        chunks.append(chunk)
     return chunks
 
-if __name__ == "__main__":
-    url = input("Enter the novel chapter URL: ")
-    novel_text = extract_novel_content(url)
-
-    # Save the extracted text to a file
-    with open("novel.txt", "w", encoding="utf-8") as file:
-        file.write(novel_text)
-
-    print("\nExtracted text has been saved to 'novel.txt'")
-
-    # Read the extracted novel
-    text_to_translate = read_novel_from_file("novel.txt")
-
-    # Split text into chunks for translation
-    text_chunks = split_text(text_to_translate)
-
-    translated_chunks = []
-    print("\nTranslating text...")
-
-    for index, chunk in enumerate(text_chunks):
-        print(f"Translating chunk {index + 1} of {len(text_chunks)}...")
-        translated_text = translate_text(chunk, "Chinese", "English")
-        translated_chunks.append(translated_text)
-
-    # Combine all translated chunks
-    full_translation = "\n".join(translated_chunks)
-
-    # Save translated text
-    translated_path = "translated_novel.txt"
-    with open(translated_path, "w", encoding="utf-8") as file:
-        file.write(full_translation)
-
-    print(f"\nTranslation completed! Saved to '{translated_path}'")
-
-    # Generate timestamped filename
+def translate_and_upload(text):
+    chunks = split_text(text)
+    translated = "\n".join([translate_text(c) for c in chunks])
+    save_text("translated_novel.txt", translated)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     s3_key = f"library/translated_{timestamp}.txt"
+    upload_file_to_s3("translated_novel.txt", s3_key)
 
-    # Upload to S3
-    upload_file_to_s3(translated_path, s3_key)
+def main_menu():
+    print("\n📘 Welcome to BL Translator")
+    print("1. Translate a new chapter")
+    print("2. Access translated library")
+    choice = input("Select an option: ")
 
-    print(f"\nUploaded to S3 as '{s3_key}'")
+    if choice == "1":
+        print("\nChoose input method:")
+        print("1. URL\n2. Text\n3. File")
+        method = input("Input type: ")
+        if method == "1":
+            url = input("Enter chapter URL: ")
+            text = extract_novel_content(url)
+        elif method == "2":
+            print("Paste the text below (Press Ctrl+D or Ctrl+Z to end):")
+            lines = []
+            try:
+                while True:
+                    lines.append(input())
+            except EOFError:
+                pass
+            text = "\n".join(lines)
+        elif method == "3":
+            file_path = input("Enter file path: ")
+            text = read_file(file_path)
+        else:
+            print("❌ Invalid input method.")
+            return
+        save_text("novel.txt", text)
+        print("🔁 Translating and uploading...")
+        translate_and_upload(text)
+        print("✅ Done.")
+    elif choice == "2":
+        print("\n📂 Library Contents:")
+        for i, key in enumerate(list_library_files(), 1):
+            print(f"{i}. {key}")
+    else:
+        print("❌ Invalid choice.")
+
+if __name__ == "__main__":
+    main_menu()
