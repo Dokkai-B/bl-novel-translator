@@ -2,6 +2,8 @@ import openai
 import os
 from dotenv import load_dotenv
 from novel_scraper import extract_novel_content
+from upload_to_s3 import upload_file_to_s3
+from datetime import datetime
 
 # Load environment variables from .env file
 load_dotenv()
@@ -63,7 +65,7 @@ if __name__ == "__main__":
     with open("novel.txt", "w", encoding="utf-8") as file:
         file.write(novel_text)
 
-    print("\n✅ Extracted text has been saved to 'novel.txt'")
+    print("\nExtracted text has been saved to 'novel.txt'")
 
     # Read the extracted novel
     text_to_translate = read_novel_from_file("novel.txt")
@@ -72,7 +74,7 @@ if __name__ == "__main__":
     text_chunks = split_text(text_to_translate)
 
     translated_chunks = []
-    print("\n🔄 Translating text...")
+    print("\nTranslating text...")
 
     for index, chunk in enumerate(text_chunks):
         print(f"Translating chunk {index + 1} of {len(text_chunks)}...")
@@ -83,7 +85,17 @@ if __name__ == "__main__":
     full_translation = "\n".join(translated_chunks)
 
     # Save translated text
-    with open("translated_novel.txt", "w", encoding="utf-8") as file:
+    translated_path = "translated_novel.txt"
+    with open(translated_path, "w", encoding="utf-8") as file:
         file.write(full_translation)
 
-    print("\n✅ Translation completed! Saved to 'translated_novel.txt'")
+    print(f"\nTranslation completed! Saved to '{translated_path}'")
+
+    # Generate timestamped filename
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    s3_key = f"library/translated_{timestamp}.txt"
+
+    # Upload to S3
+    upload_file_to_s3(translated_path, s3_key)
+
+    print(f"\nUploaded to S3 as '{s3_key}'")
