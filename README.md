@@ -65,24 +65,39 @@ BL-Translator/
 
 1. Install Python 3.11+
 2. Create a virtual environment:
-```python -m venv venv .\venv\Scripts\activate```
+```bash
+python -m venv venv .\venv\Scripts\activate
+```
 3. Install dependencies:
 ```pip install -r requirements.txt```
 4. Create a '.env' file with AWS credentials:
-```AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=... AWS_REGION=ap-southeast-1```
-```AWS_BUCKET_NAME=bl-novel-library-adii```
+```bash
+AWS_ACCESS_KEY_ID=... 
+AWS_SECRET_ACCESS_KEY=... 
+AWS_REGION=ap-southeast-1
+AWS_BUCKET_NAME=bl-novel-library-adii
+```
+
 5. Run the Flask server:
-```python api_server.py```
+```bash 
+python api_server.py
+```
 
 ### Frontend Setup (Flutter)
 
 1. [Install Flutter](https://docs.flutter.dev/get-started)
 2. Navigate to the frontend directory:
-```cd bl_novel_translator_frontend```
+```bash
+cd bl_novel_translator_frontend
+```
 3. Get dependencies:
-```flutter pub get```
+```bash
+flutter pub get
+```
 4. Run the app:
-```flutter run -d chrome```
+```bash
+flutter run -d chrome
+```
 
 ## Author
 
