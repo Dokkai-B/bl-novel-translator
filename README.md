@@ -44,16 +44,18 @@ A personal full-stack application that allows users to translate, store, and acc
 
 ## Folder Structure
 
-BL-Translator/ 
-├── bl-novel-translator/ # Python backend │ 
-├── api_server.py │ 
-├── upload_to_s3.py │ 
-├── requirements.txt │ 
-└── ... 
-├── bl_novel_translator_frontend/ # Flutter frontend │ 
-├── lib/ │ 
-├── pubspec.yaml │ 
-└── ...
+```plaintext
+BL-Translator/
+├── bl-novel-translator/             # Python backend
+│   ├── api_server.py
+│   ├── upload_to_s3.py
+│   ├── requirements.txt
+│   └── ...
+├── bl_novel_translator_frontend/   # Flutter frontend
+│   ├── lib/
+│   ├── pubspec.yaml
+│   └── ...
+```
 
 ---
 
