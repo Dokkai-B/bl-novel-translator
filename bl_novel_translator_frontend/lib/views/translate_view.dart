@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class TranslateView extends StatefulWidget {
   const TranslateView({super.key});
@@ -12,16 +14,36 @@ class _TranslateViewState extends State<TranslateView> {
   String _translatedText = '';
   bool _isTranslating = false;
 
-  void _simulateTranslation() async {
+  Future<void> _translateWithGPT4o() async {
     setState(() {
       _isTranslating = true;
+      _translatedText = '';
     });
 
-    // Simulate delay (you’ll call GPT-4o here later)
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      final response = await http.post(
+        Uri.parse('http://127.0.0.1:5000/translate'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'text': _inputController.text}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        setState(() {
+          _translatedText = "[Translated]: ${data['translation']}";
+        });
+      } else {
+        setState(() {
+          _translatedText = 'Error: ${response.body}';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _translatedText = 'Error: $e';
+      });
+    }
 
     setState(() {
-      _translatedText = "[Translated]: ${_inputController.text}";
       _isTranslating = false;
     });
   }
@@ -50,7 +72,7 @@ class _TranslateViewState extends State<TranslateView> {
         ),
         const SizedBox(height: 12),
         ElevatedButton.icon(
-          onPressed: _isTranslating ? null : _simulateTranslation,
+          onPressed: _isTranslating ? null : _translateWithGPT4o,
           icon: const Icon(Icons.auto_fix_high),
           label: const Text('Translate'),
         ),
