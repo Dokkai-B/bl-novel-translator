@@ -48,6 +48,29 @@ class _TranslateViewState extends State<TranslateView> {
     });
   }
 
+  Future<void> _saveToS3() async {
+    final response = await http.post(
+      Uri.parse('http://127.0.0.1:5000/save'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'content': _translatedText,
+        'filename': 'chapter1_sample.txt',
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      final result = jsonDecode(response.body);
+      final filename = result['filename'];
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Saved to S3 as $filename')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to save to S3')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -75,6 +98,11 @@ class _TranslateViewState extends State<TranslateView> {
           onPressed: _isTranslating ? null : _translateWithGPT4o,
           icon: const Icon(Icons.auto_fix_high),
           label: const Text('Translate'),
+        ),
+        ElevatedButton.icon(
+          onPressed: _translatedText.isEmpty ? null : _saveToS3,
+          icon: const Icon(Icons.cloud_upload),
+          label: const Text('Save to S3'),
         ),
         const SizedBox(height: 12),
         if (_isTranslating)
