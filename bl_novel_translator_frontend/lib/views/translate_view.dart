@@ -54,7 +54,6 @@ class _TranslateViewState extends State<TranslateView> {
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'content': _translatedText,
-        'filename': 'chapter1_sample.txt',
       }),
     );
 
