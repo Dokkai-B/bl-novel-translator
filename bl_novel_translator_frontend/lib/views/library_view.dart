@@ -11,47 +11,37 @@ class LibraryView extends StatefulWidget {
 
 class _LibraryViewState extends State<LibraryView> {
   List<String> _files = [];
-  String? _selectedContent;
-  bool _isLoading = false;
-
-  final String _baseUrl = 'http://127.0.0.1:5000';
+  bool _isLoading = true;
+  bool _hasFetched = false;
 
   @override
   void initState() {
     super.initState();
-    _fetchFiles();
-  }
-
-  Future<void> _fetchFiles() async {
-    try {
-      final res = await http.get(Uri.parse('$_baseUrl/files'));
-      if (res.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(res.body);
-        setState(() {
-          _files = data.map((e) => e.toString().replaceFirst('library/', '')).toList();
-        });
-      }
-    } catch (e) {
-      debugPrint('Error fetching files: $e');
+    if (!_hasFetched) {
+      _fetchFiles();
     }
   }
 
-  Future<void> _loadFileContent(String filename) async {
+  Future<void> _fetchFiles() async {
     setState(() {
       _isLoading = true;
-      _selectedContent = null;
     });
 
     try {
-      final res = await http.get(Uri.parse('$_baseUrl/files/$filename'));
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
+      final response = await http.get(Uri.parse('http://127.0.0.1:5000/files'));
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
         setState(() {
-          _selectedContent = data['content'];
+          _files = data.map((file) => file.toString().replaceFirst('library/', '')).toList();
+          _hasFetched = true;
         });
+      } else {
+        throw Exception('Failed to load files');
       }
     } catch (e) {
-      debugPrint('Error loading file: $e');
+      setState(() {
+        _files = ['Error: $e'];
+      });
     } finally {
       setState(() {
         _isLoading = false;
@@ -59,35 +49,68 @@ class _LibraryViewState extends State<LibraryView> {
     }
   }
 
+  Future<void> _previewFile(String filename) async {
+    final response = await http.get(Uri.parse('http://127.0.0.1:5000/files/$filename'));
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(data['filename']),
+          content: SingleChildScrollView(
+            child: Text(data['content']),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to load file content')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        const Text('📚 Translated Files',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 12),
-        Expanded(
-          child: ListView.builder(
-            itemCount: _files.length,
-            itemBuilder: (context, index) {
-              final filename = _files[index];
-              return ListTile(
-                title: Text(filename),
-                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                onTap: () => _loadFileContent(filename),
-              );
-            },
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Translated Files',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            IconButton(
+              onPressed: _fetchFiles,
+              icon: const Icon(Icons.refresh),
+              tooltip: 'Refresh',
+            ),
+          ],
         ),
-        const Divider(),
+        const SizedBox(height: 8),
         if (_isLoading)
           const CircularProgressIndicator()
-        else if (_selectedContent != null)
+        else
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(12),
-              child: Text(_selectedContent!),
-            ),
+            child: _files.isEmpty
+                ? const Text('No files found.')
+                : ListView.builder(
+                    itemCount: _files.length,
+                    itemBuilder: (context, index) {
+                      return ListTile(
+                        leading: const Icon(Icons.description),
+                        title: Text(_files[index]),
+                        trailing: const Icon(Icons.visibility),
+                        onTap: () => _previewFile(_files[index]),
+                      );
+                    },
+                  ),
           ),
       ],
     );
