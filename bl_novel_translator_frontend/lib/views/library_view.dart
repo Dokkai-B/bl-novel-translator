@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../services/file_cache_service.dart';
+
 
 class LibraryView extends StatefulWidget {
   const LibraryView({super.key});
@@ -23,6 +25,18 @@ class _LibraryViewState extends State<LibraryView> {
   }
 
   Future<void> _fetchFiles() async {
+    final cache = FileCacheService();
+
+    // Use cache if available
+    if (cache.isCached) {
+      setState(() {
+        _files = cache.cachedFiles;
+        _isLoading = false;
+        _hasFetched = true;
+      });
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
@@ -31,10 +45,14 @@ class _LibraryViewState extends State<LibraryView> {
       final response = await http.get(Uri.parse('http://127.0.0.1:5000/files'));
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
+        final cleaned = data.map((file) => file.toString().replaceFirst('library/', '')).toList();
+
+        // Update UI and cache
         setState(() {
-          _files = data.map((file) => file.toString().replaceFirst('library/', '')).toList();
+          _files = cleaned;
           _hasFetched = true;
         });
+        cache.cachedFiles = cleaned;
       } else {
         throw Exception('Failed to load files');
       }
@@ -48,7 +66,6 @@ class _LibraryViewState extends State<LibraryView> {
       });
     }
   }
-
   Future<void> _previewFile(String filename) async {
     final response = await http.get(Uri.parse('http://127.0.0.1:5000/files/$filename'));
     if (response.statusCode == 200) {
@@ -87,9 +104,12 @@ class _LibraryViewState extends State<LibraryView> {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             IconButton(
-              onPressed: _fetchFiles,
               icon: const Icon(Icons.refresh),
               tooltip: 'Refresh',
+              onPressed: () {
+                FileCacheService().clear();
+                _fetchFiles();
+              },
             ),
           ],
         ),
