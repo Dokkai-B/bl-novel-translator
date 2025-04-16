@@ -11,6 +11,7 @@ class TranslateView extends StatefulWidget {
 
 class _TranslateViewState extends State<TranslateView> {
   final TextEditingController _inputController = TextEditingController();
+  final TextEditingController _filenameController = TextEditingController();
   String _translatedText = '';
   bool _isTranslating = false;
 
@@ -54,6 +55,7 @@ class _TranslateViewState extends State<TranslateView> {
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'content': _translatedText,
+        'filename': _filenameController.text.trim(),
       }),
     );
 
@@ -90,6 +92,17 @@ class _TranslateViewState extends State<TranslateView> {
               filled: true,
               fillColor: Colors.grey.shade100,
             ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _filenameController,
+          decoration: InputDecoration(
+            labelText: 'Optional Filename',
+            hintText: 'e.g., chapter_1_intro.txt',
+            border: OutlineInputBorder(),
+            filled: true,
+            fillColor: Colors.grey.shade100,
           ),
         ),
         const SizedBox(height: 12),

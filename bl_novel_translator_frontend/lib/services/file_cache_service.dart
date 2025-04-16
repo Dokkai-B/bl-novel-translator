@@ -1,21 +1,26 @@
 class FileCacheService {
   static final FileCacheService _instance = FileCacheService._internal();
 
-  List<String>? _cachedFiles;
+  factory FileCacheService() => _instance;
 
   FileCacheService._internal();
 
-  factory FileCacheService() => _instance;
+  List<String> _cachedFiles = [];
+  Map<String, String> _cachedContent = {}; // Add this
 
-  bool get isCached => _cachedFiles != null;
+  List<String> get cachedFiles => _cachedFiles;
+  set cachedFiles(List<String> files) => _cachedFiles = files;
 
-  List<String> get cachedFiles => _cachedFiles ?? [];
+  Map<String, String> get cachedContent => _cachedContent;
 
-  set cachedFiles(List<String> files) {
-    _cachedFiles = files;
+  void cacheContent(String filename, String content) {
+    _cachedContent[filename] = content;
   }
 
   void clear() {
-    _cachedFiles = null;
+    _cachedFiles.clear();
+    _cachedContent.clear();
   }
+
+  bool get isCached => _cachedFiles.isNotEmpty;
 }
