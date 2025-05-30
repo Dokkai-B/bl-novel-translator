@@ -28,7 +28,7 @@ class _HomeScreenState extends State<HomeScreen> {
  Widget _buildView() {
   switch (currentView) {
     case AppView.translator:
-      return const TranslateView();
+      return TranslateView();
     case AppView.library:
       return const LibraryView();
     case AppView.settings:

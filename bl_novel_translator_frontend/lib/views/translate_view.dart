@@ -3,132 +3,212 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 class TranslateView extends StatefulWidget {
-  const TranslateView({super.key});
-
   @override
-  State<TranslateView> createState() => _TranslateViewState();
+  _TranslateViewState createState() => _TranslateViewState();
 }
 
 class _TranslateViewState extends State<TranslateView> {
-  final TextEditingController _inputController = TextEditingController();
-  final TextEditingController _filenameController = TextEditingController();
-  String _translatedText = '';
-  bool _isTranslating = false;
+  final urlController = TextEditingController();
+  final textController = TextEditingController();
+  final filenameController = TextEditingController();
 
-  Future<void> _translateWithGPT4o() async {
+  bool isTranslated = false;
+  bool isLoading = false;
+
+  String baseUrl = "http://localhost:5000"; // ✅ Correct for web
+
+  Future<void> fetchChapterFromUrl() async {
+    final url = urlController.text.trim();
+    if (url.isEmpty) return;
+
+    if (!mounted) return;
     setState(() {
-      _isTranslating = true;
-      _translatedText = '';
+      isLoading = true;
+      isTranslated = false;
     });
 
     try {
       final response = await http.post(
-        Uri.parse('http://127.0.0.1:5000/translate'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'text': _inputController.text}),
+        Uri.parse('$baseUrl/scrape'),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"url": url}),
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        setState(() {
-          _translatedText = "[Translated]: ${data['translation']}";
-        });
+        if (!mounted) return;
+        textController.text = data['chapter'] ?? 'No chapter found.';
+        await translateText();
       } else {
-        setState(() {
-          _translatedText = 'Error: ${response.body}';
-        });
+        if (!mounted) return;
+        showSnack("Failed to fetch chapter.");
       }
     } catch (e) {
-      setState(() {
-        _translatedText = 'Error: $e';
-      });
+      if (!mounted) return;
+      showSnack("Error: $e");
     }
 
-    setState(() {
-      _isTranslating = false;
-    });
+    if (!mounted) return;
+    setState(() => isLoading = false);
   }
 
-  Future<void> _saveToS3() async {
-    final response = await http.post(
-      Uri.parse('http://127.0.0.1:5000/save'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'content': _translatedText,
-        'filename': _filenameController.text.trim(),
-      }),
-    );
+  Future<void> translateText() async {
+    final inputText = textController.text.trim();
+    if (inputText.isEmpty) return;
 
-    if (response.statusCode == 200) {
-      final result = jsonDecode(response.body);
-      final filename = result['filename'];
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Saved to S3 as $filename')),
+    if (!mounted) return;
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/translate'),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"text": inputText}),
       );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to save to S3')),
-      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (!mounted) return;
+        setState(() {
+          textController.text = data["translated_text"];
+          isTranslated = true;
+        });
+      } else {
+        if (!mounted) return;
+        showSnack("Translation failed.");
+      }
+    } catch (e) {
+      if (!mounted) return;
+      showSnack("Error: $e");
     }
+
+    if (!mounted) return;
+    setState(() => isLoading = false);
+  }
+
+  Future<void> saveToS3() async {
+    final text = textController.text.trim();
+    final filename = filenameController.text.trim();
+    if (text.isEmpty || !isTranslated) return;
+
+    if (!mounted) return;
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/save'),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "text": text,
+          "filename": filename.isNotEmpty ? filename : null,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        if (!mounted) return;
+        showSnack("Saved to S3!");
+      } else {
+        if (!mounted) return;
+        showSnack("Failed to save.");
+      }
+    } catch (e) {
+      if (!mounted) return;
+      showSnack("Error: $e");
+    }
+
+    if (!mounted) return;
+    setState(() => isLoading = false);
+  }
+
+  void showSnack(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        const Text(
-          'Enter BL Novel Chapter Text',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+    return Center(
+      child: AnimatedContainer(
+        duration: Duration(milliseconds: 300),
+        padding: EdgeInsets.all(20),
+        width: 400,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10)],
         ),
-        const SizedBox(height: 12),
-        Expanded(
-          child: TextField(
-            controller: _inputController,
-            maxLines: null,
-            expands: true,
-            decoration: InputDecoration(
-              border: OutlineInputBorder(),
-              hintText: 'Paste text here...',
-              filled: true,
-              fillColor: Colors.grey.shade100,
-            ),
+        child: SizedBox(
+          height: MediaQuery.of(context).size.height * 0.8,
+          child: Stack(
+            children: [
+              SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text("Enter BL Novel Chapter Text", style: TextStyle(fontWeight: FontWeight.bold)),
+                    SizedBox(height: 10),
+                    TextField(
+                      controller: urlController,
+                      decoration: InputDecoration(
+                        hintText: "Paste chapter URL here...",
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    ElevatedButton(
+                      onPressed: isLoading ? null : fetchChapterFromUrl,
+                      child: Text("Fetch from URL"),
+                    ),
+                    SizedBox(height: 10),
+                    TextField(
+                      controller: textController,
+                      maxLines: 8,
+                      decoration: InputDecoration(
+                        hintText: "Paste text here...",
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    TextField(
+                      controller: filenameController,
+                      decoration: InputDecoration(
+                        hintText: "Optional Filename",
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        ElevatedButton.icon(
+                          onPressed: isLoading ? null : translateText,
+                          icon: Icon(Icons.translate),
+                          label: Text("Translate"),
+                        ),
+                        ElevatedButton.icon(
+                          onPressed: (!isTranslated || isLoading) ? null : saveToS3,
+                          icon: Icon(Icons.cloud_upload),
+                          label: Text("Save to S3"),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              if (isLoading)
+                Positioned.fill(
+                  child: Container(
+                    color: Colors.white.withOpacity(0.7),
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                ),
+            ],
           ),
         ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _filenameController,
-          decoration: InputDecoration(
-            labelText: 'Optional Filename',
-            hintText: 'e.g., chapter_1_intro.txt',
-            border: OutlineInputBorder(),
-            filled: true,
-            fillColor: Colors.grey.shade100,
-          ),
-        ),
-        const SizedBox(height: 12),
-        ElevatedButton.icon(
-          onPressed: _isTranslating ? null : _translateWithGPT4o,
-          icon: const Icon(Icons.auto_fix_high),
-          label: const Text('Translate'),
-        ),
-        ElevatedButton.icon(
-          onPressed: _translatedText.isEmpty ? null : _saveToS3,
-          icon: const Icon(Icons.cloud_upload),
-          label: const Text('Save to S3'),
-        ),
-        const SizedBox(height: 12),
-        if (_isTranslating)
-          const CircularProgressIndicator()
-        else if (_translatedText.isNotEmpty)
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.indigo.shade50,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(_translatedText),
-          ),
-      ],
+      ),
     );
   }
 }
